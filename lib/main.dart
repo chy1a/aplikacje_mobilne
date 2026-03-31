@@ -3,20 +3,36 @@ import 'package:flutter/material.dart';
 void main() {
   runApp(MyApp());
 }
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
+   const MyApp({super.key});
+  @override
+  State<MyApp> createState() => HomeScreenState();
+
+
+}
+class HomeScreenState extends State<MyApp>{
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: Text("krakflow"),
+        title: Text("KrakFlow"),
+      ),
+      body: Center(
+        child: Text("Lista zadań"),
+      ),
+        floatingActionButton: FloatingActionButton(
+            onPressed: (){},
+            child: Icon(Icons.add),
         ),
-        body: Center(child: Column( children: [Text("Plan zajęć "), Text("dzisiejsz zadania"),],)
-          
 
-
-    ),
       )
     );
   }
 }
+
+class AddTaskScreen extends State<MyApp>{
+
+}
+
+
