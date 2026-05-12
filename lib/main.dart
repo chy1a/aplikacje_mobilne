@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'task_repository.dart';
+import 'task_api_service.dart';
 
 void main() => runApp(const MyApp());
 
@@ -7,7 +8,10 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(theme: ThemeData(primarySwatch: Colors.blue), home: const HomeScreen());
+    return MaterialApp(
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const HomeScreen(),
+    );
   }
 }
 
@@ -19,58 +23,93 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String selectedFilter = "wszystkie";
+  late Future<List<Task>> _tasksFuture;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _tasksFuture = TaskApiService.fetchTasks().then((tasks) {
+      TaskRepository.tasks = tasks;
+      return tasks;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-
-    List<Task> filteredTasks = TaskRepository.tasks.where((task) {
-      if (selectedFilter == "wykonane") return task.done;
-      if (selectedFilter == "do zrobienia") return !task.done;
-      return true;
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("KrakFlow"),
+        title: const Text("KrakFlow API"),
         actions: [
-
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => setState(() {
+              _tasksFuture = TaskApiService.fetchTasks().then((tasks) {
+                TaskRepository.tasks = tasks;
+                return tasks;
+              });
+            }),
+          ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             onPressed: TaskRepository.tasks.isEmpty ? null : () => _showDeleteAllDialog(),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: ListView.builder(
-              itemCount: filteredTasks.length,
-              itemBuilder: (context, index) {
-                final task = filteredTasks[index];
+      body: FutureBuilder<List<Task>>(
+        future: _tasksFuture,
+        builder: (context, snapshot) {
 
-                return Dismissible(
-                  key: ObjectKey(task),
-                  direction: DismissDirection.endToStart,
-                  background: Container(color: Colors.red, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
-                  onDismissed: (direction) {
-                    setState(() => TaskRepository.tasks.remove(task));
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usunięto: ${task.title}")));
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text("Błąd: ${snapshot.error}"));
+          }
+
+
+          List<Task> filteredTasks = TaskRepository.tasks.where((task) {
+            if (selectedFilter == "wykonane") return task.done;
+            if (selectedFilter == "do zrobienia") return !task.done;
+            return true;
+          }).toList();
+
+          return Column(
+            children: [
+              _buildFilterBar(),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredTasks.length,
+                  itemBuilder: (context, index) {
+                    final task = filteredTasks[index];
+                    return Dismissible(
+                      key: ObjectKey(task),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (direction) {
+                        setState(() => TaskRepository.tasks.remove(task));
+                      },
+                      child: TaskCard(
+                        task: task,
+                        onChanged: (val) => setState(() => task.done = val!),
+                        onTap: () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (context) => EditTaskScreen(task: task)));
+                          setState(() {});
+                        },
+                      ),
+                    );
                   },
-                  child: TaskCard(
-                    task: task,
-                    onChanged: (val) => setState(() => task.done = val!),
-                    onTap: () async {
-
-                      await Navigator.push(context, MaterialPageRoute(builder: (context) => EditTaskScreen(task: task)));
-                      setState(() {});
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -82,19 +121,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Widget _buildFilterBar() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: ["wszystkie", "do zrobienia", "wykonane"].map((f) {
         return TextButton(
           onPressed: () => setState(() => selectedFilter = f),
-          child: Text(f.toUpperCase(), style: TextStyle(color: selectedFilter == f ? Colors.blue : Colors.grey, fontWeight: selectedFilter == f ? FontWeight.bold : FontWeight.normal)),
+          child: Text(
+            f.toUpperCase(),
+            style: TextStyle(
+              color: selectedFilter == f ? Colors.blue : Colors.grey,
+              fontWeight: selectedFilter == f ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
         );
       }).toList(),
     );
   }
-
 
   void _showDeleteAllDialog() {
     showDialog(
@@ -104,17 +147,18 @@ class _HomeScreenState extends State<HomeScreen> {
         content: const Text("Czy na pewno chcesz wyczyścić listę zadań?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("ANULUJ")),
-          TextButton(onPressed: () {
-            setState(() => TaskRepository.tasks.clear());
-            Navigator.pop(ctx);
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lista wyczyszczona")));
-          }, child: const Text("USUŃ", style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () {
+              setState(() => TaskRepository.tasks.clear());
+              Navigator.pop(ctx);
+            },
+            child: const Text("USUŃ", style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
   }
 }
-
 
 class TaskCard extends StatelessWidget {
   final Task task;
@@ -129,14 +173,19 @@ class TaskCard extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: Checkbox(value: task.done, onChanged: onChanged),
-        title: Text(task.title, style: TextStyle(decoration: task.done ? TextDecoration.lineThrough : null, color: task.done ? Colors.grey : Colors.black)),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            decoration: task.done ? TextDecoration.lineThrough : null,
+            color: task.done ? Colors.grey : Colors.black,
+          ),
+        ),
         subtitle: Text("Termin: ${task.deadline} | Priorytet: ${task.priority}"),
         trailing: const Icon(Icons.edit, size: 20),
       ),
     );
   }
 }
-
 
 class EditTaskScreen extends StatelessWidget {
   final Task task;
@@ -174,7 +223,6 @@ class EditTaskScreen extends StatelessWidget {
   }
 }
 
-
 class AddTaskScreen extends StatelessWidget {
   final titleController = TextEditingController();
   final deadlineController = TextEditingController();
@@ -192,11 +240,21 @@ class AddTaskScreen extends StatelessWidget {
             TextField(controller: titleController, decoration: const InputDecoration(labelText: "Tytuł")),
             TextField(controller: deadlineController, decoration: const InputDecoration(labelText: "Termin")),
             TextField(controller: priorityController, decoration: const InputDecoration(labelText: "Priorytet")),
-            ElevatedButton(onPressed: () => Navigator.pop(context, Task(title: titleController.text, deadline: deadlineController.text, priority: priorityController.text, done: false)), child: const Text("DODAJ")),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(
+                context,
+                Task(
+                  title: titleController.text,
+                  deadline: deadlineController.text,
+                  priority: priorityController.text,
+                  done: false,
+                ),
+              ),
+              child: const Text("DODAJ"),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
