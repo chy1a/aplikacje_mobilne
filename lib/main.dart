@@ -1,101 +1,106 @@
 import 'package:flutter/material.dart';
+import 'task_repository.dart';
 
-void main() {
-  runApp(MyApp());
-}
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
-
-  final List<Task> tasks = [
-    Task(title: "pójść na zajęcia", deadline: "dzisiaj", done: true, priority: "wysoki"),
-    Task(title: "zrobić zakupy", deadline: "jutro", done: false, priority: "średni"),
-    Task(title: "Pójść na siłownię", deadline: "środa", done: false, priority: "niski"),
-    Task(title: "zrobić grilla", deadline: "weekend", done: false, priority: "wysoki"),
-  ];
-
+  const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-
-    int completedTasks = tasks.where((t) => t.done).length;
-
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text("KrakFlow"),
-        ),
-        body: Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      home: const HomeScreen(),
+    );
+  }
+}
 
-              Text(
-                "Masz dziś ${tasks.length} zadania, wykonano: $completedTasks",
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-              SizedBox(height: 10),
 
-              Text(
-                "Dzisiejsze zadania",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 16),
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-              Expanded(
-                child: ListView(
-                  children: tasks.map((task) => TaskCard(task: task)).toList(),
-                ),
-              ),
-            ],
-          ),
-        ),
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("KrakFlow")),
+      body: ListView.builder(
+        itemCount: TaskRepository.tasks.length,
+        itemBuilder: (context, index) {
+          final task = TaskRepository.tasks[index];
+          return Card(
+            child: ListTile(
+              leading: Icon(task.done ? Icons.check_circle : Icons.radio_button_unchecked),
+              title: Text(task.title),
+              subtitle: Text("Termin: ${task.deadline} | Priorytet: ${task.priority}"),
+            ),
+          );
+        },
+      ),
+
+      floatingActionButton: FloatingActionButton(
+        child: const Icon(Icons.add),
+        onPressed: () async {
+          final Task? newTask = await Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, anim, secAnim) => AddTaskScreen(),
+              transitionsBuilder: (context, anim, secAnim, child) {
+                return FadeTransition(opacity: anim, child: child);
+              },
+            ),
+          );
+
+          if (newTask != null) {
+            setState(() {
+              TaskRepository.tasks.add(newTask);
+            });
+          }
+        },
       ),
     );
   }
 }
 
 
-class TaskCard extends StatelessWidget {
-  final Task task;
+class AddTaskScreen extends StatelessWidget {
+  AddTaskScreen({super.key});
 
-  const TaskCard({super.key, required this.task});
+  final titleController = TextEditingController();
+  final deadlineController = TextEditingController();
+  final priorityController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      margin: EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Icon(
+    return Scaffold(
+      appBar: AppBar(title: const Text("Nowe zadanie")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(controller: titleController, decoration: const InputDecoration(labelText: "Tytuł")),
+            TextField(controller: deadlineController, decoration: const InputDecoration(labelText: "Termin")),
+            TextField(controller: priorityController, decoration: const InputDecoration(labelText: "Priorytet")),
+            const SizedBox(height: 20),
 
-          task.done ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: task.done ? Colors.green : Colors.grey,
+            ElevatedButton(
+              onPressed: () {
+                if (titleController.text.isNotEmpty) {
+                  final newTask = Task(
+                    title: titleController.text,
+                    deadline: deadlineController.text,
+                    priority: priorityController.text,
+                    done: false,
+                  );
+                  Navigator.pop(context, newTask);
+                }
+              },
+              child: const Text("Zapisz"),
+            ),
+          ],
         ),
-        title: Text(
-          task.title,
-          style: TextStyle(fontWeight: FontWeight.w500),
-        ),
-
-        subtitle: Text("termin: ${task.deadline} | priorytet: ${task.priority}"),
       ),
     );
   }
-}
-
-
-class Task {
-  final String title;
-  final String deadline;
-  final bool done;
-  final String priority;
-
-  Task({
-    required this.title,
-    required this.deadline,
-    required this.done,
-    required this.priority,
-  });
 }
