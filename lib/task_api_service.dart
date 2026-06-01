@@ -18,6 +18,7 @@ class TaskApiService {
 
       return todos.map((todo) {
         return Task(
+          id: todo["id"],
           title: todo["todo"],
           deadline: "2024-05-${random.nextInt(28) + 1}",
           done: todo["completed"],
