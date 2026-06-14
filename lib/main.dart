@@ -5,6 +5,7 @@ import 'task_api_service.dart';
 import 'task_local_database.dart';
 import 'task_sync_service.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
